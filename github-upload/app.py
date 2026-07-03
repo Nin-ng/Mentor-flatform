@@ -67,7 +67,17 @@ def db_cursor():
         conn.close()
 
 
+@st.cache_resource
 def init_db() -> None:
+    # Runs once per app process (st.cache_resource), and tolerates the benign race where
+    # two near-simultaneous cold starts both try to create the tables at once.
+    try:
+        _run_init_db()
+    except psycopg2.errors.UniqueViolation:
+        pass
+
+
+def _run_init_db() -> None:
     with db_cursor() as cur:
         cur.execute(
             """
