@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL_LARGE = "llama3-70b-8192"
-GROQ_MODEL_SMALL = "llama3-8b-8192"
+GROQ_MODEL_LARGE = "llama-3.3-70b-versatile"
+GROQ_MODEL_SMALL = "llama-3.1-8b-instant"
 
 ROLE_COLORS = {"Judge": "#ff4b4b", "Mentor": "#1c83e1", "Co-worker": "#21c354"}
 ROLE_ICONS = {"Judge": "❌", "Mentor": "📚", "Co-worker": "🤝"}
@@ -307,7 +307,12 @@ def call_groq(
                 "or .env (local)."
             )
         resp = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as http_exc:
+            # raise_for_status()'s message alone drops Groq's actual error body (e.g. which
+            # model/param was invalid) — append it so the audit log is actually debuggable.
+            raise requests.HTTPError(f"{http_exc} | body: {resp.text}") from http_exc
         data = resp.json()
         response_text = data["choices"][0]["message"]["content"]
     except Exception as exc:  # noqa: BLE001 - surface any failure into the audit log
